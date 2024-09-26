@@ -3,7 +3,6 @@ import telebot
 import yt_dlp
 import os
 
-
 bot = telebot.TeleBot(TG_TOKEN)
 
 # Словарь для хранения данных пользователей
@@ -12,17 +11,37 @@ user_data = {}
 # Обработчик команды /start
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, "Привет! Отправь команду /vk, чтобы скачать видео с ВКонтакте.")
-@bot.message_handler(commands=['vk'])
-def ask_for_link(message):
-    msg = bot.reply_to(message, "Пожалуйста, отправьте ссылку на видео ВКонтакте.")
-    bot.register_next_step_handler(msg, ask_for_quality)
+    bot.reply_to(message, "Привет! Отправь команду /vk, чтобы скачать видео с ВКонтакте или /youtube для скачивания видео с YouTube.")
 
-# Запрос качества у пользователя
-def ask_for_quality(message):
+# Обработчик команды /vk
+@bot.message_handler(commands=['vk'])
+def ask_for_vk_link(message):
+    msg = bot.reply_to(message, "Пожалуйста, отправьте ссылку на видео ВКонтакте.")
+    bot.register_next_step_handler(msg, ask_for_vk_quality)
+
+# Обработчик команды /youtube
+@bot.message_handler(commands=['youtube'])
+def ask_for_youtube_link(message):
+    msg = bot.reply_to(message, "Пожалуйста, отправьте ссылку на видео YouTube.")
+    bot.register_next_step_handler(msg, ask_for_youtube_quality)
+
+# Запрос качества у пользователя для VK
+def ask_for_vk_quality(message):
     video_url = message.text
     chat_id = message.chat.id
-    user_data[chat_id] = {'video_url': video_url}  # Сохраняем ссылку на видео
+    user_data[chat_id] = {'video_url': video_url, 'platform': 'vk'}
+
+    markup = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    markup.add('720p', '480p', '360p')
+
+    msg = bot.reply_to(message, "Выберите качество видео:", reply_markup=markup)
+    bot.register_next_step_handler(msg, download_video)
+
+# Запрос качества у пользователя для YouTube
+def ask_for_youtube_quality(message):
+    video_url = message.text
+    chat_id = message.chat.id
+    user_data[chat_id] = {'video_url': video_url, 'platform': 'youtube'}
 
     markup = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True)
     markup.add('720p', '480p', '360p')
@@ -34,12 +53,12 @@ def ask_for_quality(message):
 def download_video(message):
     quality = message.text
     chat_id = message.chat.id
-
-    video_url = user_data[chat_id].get('video_url')  # Получаем ссылку из данных пользователя
+    video_url = user_data[chat_id].get('video_url')
+    platform = user_data[chat_id].get('platform')
 
     ydl_opts = {
         'format': f'bestvideo[height<={quality[:-1]}]+bestaudio/best',
-        'outtmpl': f'{chat_id}_video.mp4',  # Имя файла зависит от chat_id
+        'outtmpl': f'{chat_id}_video.mp4',
     }
 
     try:
